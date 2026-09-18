@@ -13,18 +13,49 @@ Serves on 127.0.0.1 only — reachable exclusively via SSH port forwarding:
 
 from __future__ import annotations
 
+import json
 import os
+import sqlite3
 import sys
-import threading
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from applypilot.config import APP_DIR  # noqa: E402
+from applypilot.config import APP_DIR, DB_PATH  # noqa: E402
 from applypilot.view import generate_dashboard  # noqa: E402
 
 PORT = 8730
+
+
+def api_delete(url: str) -> dict:
+    """Remove a job (and its material files) and tombstone the URL."""
+    if not url or not isinstance(url, str):
+        return {"ok": False, "error": "url required"}
+    conn = sqlite3.connect(DB_PATH, timeout=15)
+    try:
+        row = conn.execute(
+            "SELECT tailored_resume_path, cover_letter_path FROM jobs WHERE url = ?", (url,)
+        ).fetchone()
+        removed_files = []
+        if row:
+            for path in row:
+                if path:
+                    p = Path(path)
+                    if APP_DIR in p.resolve().parents and p.exists():
+                        p.unlink()
+                        removed_files.append(p.name)
+        from datetime import datetime, timezone
+        conn.execute(
+            "INSERT OR IGNORE INTO dismissed_urls (url, fit_score, dismissed_at) VALUES (?, NULL, ?)",
+            (url, datetime.now(timezone.utc).isoformat()),
+        )
+        cur = conn.execute("DELETE FROM jobs WHERE url = ?", (url,))
+        conn.commit()
+        return {"ok": True, "deleted": cur.rowcount, "files_removed": len(removed_files)}
+    finally:
+        conn.close()
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -38,6 +69,23 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self.path = "/dashboard.html"
         return super().do_GET()
+
+    def do_POST(self) -> None:  # noqa: N802
+        if self.path.split("?")[0] != "/api/delete":
+            self.send_error(404)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            payload = json.loads(self.rfile.read(length) or b"{}")
+            result = api_delete(payload.get("url", ""))
+            body = json.dumps(result).encode()
+            self.send_response(200 if result.get("ok") else 400)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except Exception as e:
+            self.send_error(500, str(e))
 
     def log_message(self, fmt: str, *args) -> None:
         print(f"[web] {self.address_string()} {fmt % args}", flush=True)

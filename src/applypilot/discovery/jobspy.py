@@ -133,9 +133,15 @@ def store_jobspy_results(conn: sqlite3.Connection, df, source_label: str) -> tup
     new = 0
     existing = 0
 
+    from applypilot.database import load_dismissed
+    dismissed = load_dismissed(conn)
+
     for _, row in df.iterrows():
         url = _clean_field(row.get("job_url"))
         if not url:
+            continue
+        if url in dismissed:
+            existing += 1
             continue
 
         title = _clean_field(row.get("title"))

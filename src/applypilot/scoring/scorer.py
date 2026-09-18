@@ -192,9 +192,19 @@ def run_scoring(limit: int = 0, rescore: bool = False) -> dict:
             completed, len(jobs), result["score"], job.get("title", "?")[:60],
         )
 
-    # Write scores to DB
+    # Write scores to DB. Jobs scoring below the keep threshold are dismissed
+    # entirely (tombstoned + deleted) so the dashboard stays clean and they are
+    # never re-scored on later cycles. score==0 means an LLM error — keep for retry.
     now = datetime.now(timezone.utc).isoformat()
+    dismissed = 0
+    from applypilot.config import DEFAULTS
+    from applypilot.database import dismiss_url
+    keep_threshold = DEFAULTS["min_score"]
     for r in results:
+        if 1 <= r["score"] < keep_threshold:
+            dismiss_url(conn, r["url"], r["score"])
+            dismissed += 1
+            continue
         remote = r.get("remote", "unknown")
         remote_ok = 1 if remote == "yes" else (0 if remote == "no" else None)
         conn.execute(
@@ -202,6 +212,8 @@ def run_scoring(limit: int = 0, rescore: bool = False) -> dict:
             (r["score"], remote_ok, f"{r['keywords']}\n{r['reasoning']}", now, r["url"]),
         )
     conn.commit()
+    if dismissed:
+        log.info("Dismissed %d jobs scoring below %d (removed from DB)", dismissed, keep_threshold)
 
     elapsed = time.time() - t0
     log.info("Done: %d scored in %.1fs (%.1f jobs/sec)", len(results), elapsed, len(results) / elapsed if elapsed > 0 else 0)

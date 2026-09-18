@@ -303,6 +303,9 @@ def store_results(conn: sqlite3.Connection, jobs: list[dict], employers: dict) -
     new = 0
     existing = 0
 
+    from applypilot.database import load_dismissed
+    dismissed = load_dismissed(conn)
+
     for job in jobs:
         url = job.get("apply_url", "")
         if not url:
@@ -310,6 +313,9 @@ def store_results(conn: sqlite3.Connection, jobs: list[dict], employers: dict) -
             if emp and job.get("external_path"):
                 url = f"{emp['base_url']}/{emp['site_id']}{job['external_path']}"
         if not url:
+            continue
+        if url in dismissed:
+            existing += 1
             continue
 
         description = job.get("full_description", "")

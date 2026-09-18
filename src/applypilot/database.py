@@ -132,6 +132,17 @@ def init_db(db_path: Path | str | None = None) -> sqlite3.Connection:
             verification_confidence TEXT
         )
     """)
+
+    # Tombstones for jobs the user dismissed (deleted from dashboard) or that
+    # scored below the keep threshold. Discovery skips these URLs so they are
+    # never re-inserted and never re-scored on subsequent cycles.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS dismissed_urls (
+            url          TEXT PRIMARY KEY,
+            fit_score    INTEGER,
+            dismissed_at TEXT
+        )
+    """)
     conn.commit()
 
     # Run migrations for any columns added after initial schema
@@ -345,9 +356,13 @@ def store_jobs(conn: sqlite3.Connection, jobs: list[dict],
     new = 0
     existing = 0
 
+    dismissed = load_dismissed(conn)
     for job in jobs:
         url = job.get("url")
         if not url:
+            continue
+        if url in dismissed:
+            existing += 1
             continue
         try:
             conn.execute(
@@ -362,6 +377,26 @@ def store_jobs(conn: sqlite3.Connection, jobs: list[dict],
 
     conn.commit()
     return new, existing
+
+
+def load_dismissed(conn: sqlite3.Connection | None = None) -> set[str]:
+    """Return the set of dismissed (tombstoned) job URLs."""
+    if conn is None:
+        conn = get_connection()
+    try:
+        return {row[0] for row in conn.execute("SELECT url FROM dismissed_urls")}
+    except sqlite3.OperationalError:
+        return set()
+
+
+def dismiss_url(conn: sqlite3.Connection, url: str, fit_score: int | None = None) -> None:
+    """Tombstone a URL and remove it from the jobs table."""
+    from datetime import datetime, timezone
+    conn.execute(
+        "INSERT OR IGNORE INTO dismissed_urls (url, fit_score, dismissed_at) VALUES (?, ?, ?)",
+        (url, fit_score, datetime.now(timezone.utc).isoformat()),
+    )
+    conn.execute("DELETE FROM jobs WHERE url = ?", (url,))
 
 
 def get_jobs_by_stage(conn: sqlite3.Connection | None = None,

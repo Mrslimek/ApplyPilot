@@ -179,10 +179,11 @@ def generate_dashboard(output_path: str | None = None) -> str:
             apply_html = f'<a href="{apply_url}" class="apply-link" target="_blank">Apply</a>'
 
         job_sections += f"""
-        <div class="job-card" data-score="{score}" data-site="{escape(j['site'] or '')}" data-location="{location.lower()}">
+        <div class="job-card" data-score="{score}" data-site="{escape(j['site'] or '')}" data-location="{location.lower()}" data-url="{escape(url)}">
           <div class="card-header">
             <span class="score-pill" style="background:{'#10b981' if score >= 7 else '#f59e0b'}">{score}</span>
             <a href="{url}" class="job-title" target="_blank">{title}</a>
+            <button class="del-btn" title="Remove from ApplyPilot">&#10005;</button>
           </div>
           <div class="meta-row">{meta_html}</div>
           {f'<div class="keywords-row">{escape(keywords)}</div>' if keywords else ''}
@@ -262,6 +263,10 @@ def generate_dashboard(output_path: str | None = None) -> str:
   .job-card[data-score="5"] {{ border-left-color: #f59e0b88; }}
 
   .card-header {{ display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }}
+  .del-btn {{ margin-left: auto; background: transparent; border: 1px solid #475569; color: #94a3b8;
+              border-radius: 6px; width: 22px; height: 22px; line-height: 1; cursor: pointer;
+              font-size: 12px; flex-shrink: 0; }}
+  .del-btn:hover {{ background: #7f1d1d; border-color: #ef4444; color: #fecaca; }}
   .score-pill {{ display: inline-flex; align-items: center; justify-content: center; min-width: 1.6rem; height: 1.6rem; border-radius: 6px; color: #0f172a; font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }}
 
   .job-title {{ color: #e2e8f0; text-decoration: none; font-weight: 600; font-size: 0.95rem; }}
@@ -382,6 +387,51 @@ function applyFilters() {{
 }}
 
 applyFilters();
+
+// ── Delete support ────────────────────────────────────────────────────
+function removeCard(url) {{
+  document.querySelectorAll('.job-card').forEach(c => {{
+    if (c.dataset.url === url) {{
+      const grid = c.parentElement;
+      c.remove();
+      if (grid && grid.querySelectorAll('.job-card:not(.hidden)').length === 0) {{
+        const header = grid.previousElementSibling;
+        if (header && header.classList.contains('score-header')) {{ header.style.display = 'none'; grid.style.display = 'none'; }}
+      }}
+      const total = document.querySelectorAll('.job-card').length;
+      const shown = document.querySelectorAll('.job-card:not(.hidden)').length;
+      const counter = document.getElementById('job-count');
+      if (counter) counter.textContent = `Showing ${{shown}} of ${{total}} jobs`;
+    }}
+  }});
+}}
+function deleteJob(url) {{
+  fetch('/api/delete', {{
+    method: 'POST',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{url: url}})
+  }})
+  .then(r => r.ok ? removeCard(url) : alert('Delete failed (HTTP ' + r.status + ')'))
+  .catch(() => alert('Delete failed'));
+}}
+document.addEventListener('click', e => {{
+  const delBtn = e.target.closest('.del-btn');
+  if (delBtn) {{
+    const card = delBtn.closest('.job-card');
+    if (card && confirm('Delete this job from ApplyPilot?')) deleteJob(card.dataset.url);
+    return;
+  }}
+  const link = e.target.closest('a.job-title, a.apply-link');
+  if (link) {{
+    const card = link.closest('.job-card');
+    if (card) {{
+      // The job opens in a new tab; afterwards ask whether to drop it here.
+      setTimeout(() => {{
+        if (confirm('Remove this job from the list? (e.g. you already applied)')) deleteJob(card.dataset.url);
+      }}, 1500);
+    }}
+  }}
+}});
 </script>
 
 </body>
