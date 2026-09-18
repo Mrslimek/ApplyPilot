@@ -83,7 +83,7 @@ def run(
             "Defaults to 'all' if omitted."
         ),
     ),
-    min_score: int = typer.Option(7, "--min-score", help="Minimum fit score for tailor/cover stages."),
+    min_score: int = typer.Option(5, "--min-score", help="Minimum fit score for tailor/cover stages."),
     workers: int = typer.Option(1, "--workers", "-w", help="Parallel threads for discovery/enrichment stages."),
     stream: bool = typer.Option(False, "--stream", help="Run stages concurrently (streaming mode)."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Preview stages without executing."),
@@ -146,8 +146,8 @@ def run(
 def apply(
     limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Max applications to submit."),
     workers: int = typer.Option(1, "--workers", "-w", help="Number of parallel browser workers."),
-    min_score: int = typer.Option(7, "--min-score", help="Minimum fit score for job selection."),
-    model: str = typer.Option("haiku", "--model", "-m", help="Claude model name."),
+    min_score: int = typer.Option(5, "--min-score", help="Minimum fit score for job selection."),
+    model: str = typer.Option("glm-5.3-flash", "--model", "-m", help="Claude model name (or any model served via ANTHROPIC_BASE_URL bridge, e.g. z.ai GLM)."),
     continuous: bool = typer.Option(False, "--continuous", "-c", help="Run forever, polling for new jobs."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Preview actions without submitting."),
     headless: bool = typer.Option(False, "--headless", help="Run browsers in headless mode."),
@@ -201,7 +201,8 @@ def apply(
     if not (gen and url):
         conn = get_connection()
         ready = conn.execute(
-            "SELECT COUNT(*) FROM jobs WHERE tailored_resume_path IS NOT NULL AND applied_at IS NULL"
+            "SELECT COUNT(*) FROM jobs WHERE tailored_resume_path IS NOT NULL "
+            "AND application_url IS NOT NULL AND applied_at IS NULL"
         ).fetchone()[0]
         if ready == 0:
             console.print(
@@ -279,7 +280,8 @@ def status() -> None:
     summary.add_row("Scored by LLM", str(stats["scored"]))
     summary.add_row("Pending scoring", str(stats["unscored"]))
     summary.add_row("Tailored resumes", str(stats["tailored"]))
-    summary.add_row("Pending tailoring (7+)", str(stats["untailored_eligible"]))
+    from applypilot.config import DEFAULTS as _DEFAULTS
+    summary.add_row(f"Pending tailoring ({_DEFAULTS['min_score']}+)", str(stats["untailored_eligible"]))
     summary.add_row("Cover letters", str(stats["with_cover_letter"]))
     summary.add_row("Ready to apply", str(stats["ready_to_apply"]))
     summary.add_row("Applied", str(stats["applied"]))

@@ -663,10 +663,15 @@ def scrape_site_batch(
 
                 if status in ("ok", "partial"):
                     stats[status] += 1
+                    app_url = result.get("application_url")
+                    # LLM extraction sometimes returns the literal string
+                    # "None"/"null" instead of JSON null — normalize to NULL.
+                    if isinstance(app_url, str) and app_url.strip().lower() in ("none", "null", "undefined", ""):
+                        app_url = None
                     conn.execute(
                         "UPDATE jobs SET full_description = ?, application_url = ?, "
                         "detail_scraped_at = ?, detail_error = NULL WHERE url = ?",
-                        (result.get("full_description"), result.get("application_url"), now, url),
+                        (result.get("full_description"), app_url, now, url),
                     )
                 else:
                     stats["error"] += 1

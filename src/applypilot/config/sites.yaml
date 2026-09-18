@@ -17,12 +17,14 @@ blocked:
     - "accenture"
     - "AccentureCareers"
     - "Workopolis"
+    - "Moderna"                 # Workday tenant requires email verification to apply
   url_patterns:
     - "%glassdoor%"
     - "%google.com/about/careers%"
     - "%google.jobs%"
     - "%accenture%"
     - "%workopolis.com/out%"
+    - "%moderna%"
 
 # ── Blocked SSO domains — cannot authenticate through these ──────────────
 blocked_sso:
