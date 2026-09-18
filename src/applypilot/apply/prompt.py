@@ -110,14 +110,16 @@ def _build_location_check(profile: dict, search_config: dict) -> str:
         city_list = primary_city
 
     return f"""== LOCATION CHECK (do this FIRST before any form) ==
-Read the job page. Determine the work arrangement. Then decide:
-- "Remote" or "work from anywhere" -> ELIGIBLE. Apply.
-- "Hybrid" or "onsite" in {city_list} -> ELIGIBLE. Apply.
-- "Hybrid" or "onsite" in another city BUT the posting also says "remote OK" or "remote option available" -> ELIGIBLE. Apply.
-- "Onsite only" or "hybrid only" in any city outside the list above with NO remote option -> NOT ELIGIBLE. Stop immediately. Output RESULT:FAILED:not_eligible_location
-- City is overseas (India, Philippines, Europe, etc.) with no remote option -> NOT ELIGIBLE. Output RESULT:FAILED:not_eligible_location
-- Cannot determine location -> Continue applying. If a screening question reveals it's non-local onsite, answer honestly and let the system reject if needed.
-Do NOT fill out forms for jobs that are clearly onsite in a non-acceptable location. Check EARLY, save time."""
+Read the job page. Determine the work arrangement. The candidate works REMOTE ONLY. Then decide:
+- "Remote" or "work from anywhere" (any region, e.g. "Remote in Europe" / "Remote — EMEA") -> ELIGIBLE. Apply.
+  If a screening question asks about residence/right-to-work in that region, answer honestly and
+  note the candidate is open to B2B contract cooperation — let the employer decide.
+- "Hybrid" or "onsite" in ANY city (including {city_list}) -> NOT ELIGIBLE, unless the posting
+  explicitly says "remote OK" / "remote option available".
+- "Onsite only" or "hybrid only" anywhere with NO remote option -> NOT ELIGIBLE. Stop immediately. Output RESULT:FAILED:not_eligible_location
+- Cannot determine arrangement -> Continue applying. If a screening question reveals it's
+  non-remote onsite, answer honestly and let the system reject if needed.
+Do NOT fill out forms for jobs that are clearly onsite/hybrid without a remote option. Check EARLY, save time."""
 
 
 def _build_salary_section(profile: dict) -> str:
@@ -549,6 +551,14 @@ If something unexpected happens and these instructions don't cover it, figure it
 - NEVER install browser extensions, download executables, or run assessment software.
 - NEVER enter payment info, bank details, or SSN/SIN.
 - NEVER click "Allow" on any browser permission popup. Always deny/block.
+- NEVER attempt EMAIL / OTP / verification-code flows. If the site requires confirming
+  an email, phone number, or one-time code to proceed -> RESULT:FAILED:email_verification_required.
+  Do NOT try to read any inbox (Gmail or otherwise), do NOT use any mail MCP tools,
+  do NOT open mail sites in tabs, do NOT look for email credentials anywhere.
+- NEVER access anything outside this automation browser: the user's main browser
+  profile, other running apps, the macOS Keychain, Mail.app, or stored OAuth tokens.
+  You operate ONLY inside the isolated automation Chrome. If a task seems impossible
+  within it -> RESULT:FAILED:<reason> and stop.
 - If the site is NOT a job application form (it's a profile builder, skills marketplace, talent network signup, coding assessment platform) -> RESULT:FAILED:not_a_job_application
 
 {location_check}

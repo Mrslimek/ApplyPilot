@@ -6,6 +6,7 @@ worker profile setup/cloning, and cross-platform process cleanup.
 
 import json
 import logging
+import os
 import platform
 import shutil
 import subprocess
@@ -100,9 +101,12 @@ def _kill_on_port(port: int) -> None:
 def setup_worker_profile(worker_id: int) -> Path:
     """Create an isolated Chrome profile for a worker.
 
-    On first run, clones from an existing worker profile (preferred, since
-    it already has session cookies) or from the user's real Chrome profile.
-    Subsequent runs reuse the existing worker profile.
+    By default creates a FRESH profile with no session cookies. Automated
+    browsing on a cloned real session triggers account flags (LinkedIn
+    "unusual activity" challenges, temporary restrictions). Cloning from an
+    existing worker profile or the user's real Chrome profile is opt-in via
+    APPLYPILOT_CLONE_CHROME_PROFILE=1 — only enable it if you accept the
+    account risk and want logged-in flows (e.g. LinkedIn Easy Apply).
 
     Args:
         worker_id: Numeric worker identifier.
@@ -113,6 +117,15 @@ def setup_worker_profile(worker_id: int) -> Path:
     profile_dir = config.CHROME_WORKER_DIR / f"worker-{worker_id}"
     if (profile_dir / "Default").exists():
         return profile_dir  # Already initialized
+
+    clone_ok = os.environ.get("APPLYPILOT_CLONE_CHROME_PROFILE", "").lower() in ("1", "true", "yes")
+    if not clone_ok:
+        logger.info(
+            "[worker-%d] Creating fresh Chrome profile (session cloning disabled; "
+            "set APPLYPILOT_CLONE_CHROME_PROFILE=1 to opt in).", worker_id,
+        )
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        return profile_dir
 
     # Find a source: prefer existing worker (has session cookies), else user profile
     source: Path | None = None
