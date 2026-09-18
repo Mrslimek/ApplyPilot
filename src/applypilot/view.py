@@ -203,59 +203,83 @@ def generate_dashboard(output_path: str | None = None) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ApplyPilot Dashboard</title>
 <style>
+  :root {{
+    --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --muted: #94a3b8; --faint: #64748b;
+    --border: #334155; --border2: #475569; --chip-bg: #334155; --chip-fg: #94a3b8;
+    --accent: #60a5fa; --accent-fg: #0f172a; --accent-soft: #60a5fa33; --accent-hover: #60a5fa22;
+    --kw: #10b981; --pill-fg: #0f172a; --desc-bg: #0f172a; --desc-text: #cbd5e1;
+    --shadow-card: #00000044; --modal-shadow: rgba(0, 0, 0, 0.5); --backdrop: rgba(15, 23, 42, 0.72);
+    --del-hover-bg: #7f1d1d; --del-hover-border: #ef4444; --del-hover-fg: #fecaca;
+    --icon-bg: #7f1d1d; --icon-fg: #fca5a5;
+  }}
+  :root[data-theme="light"] {{
+    --bg: #f1f5f9; --card: #ffffff; --text: #0f172a; --muted: #64748b; --faint: #94a3b8;
+    --border: #e2e8f0; --border2: #cbd5e1; --chip-bg: #e2e8f0; --chip-fg: #475569;
+    --accent: #2563eb; --accent-fg: #ffffff; --accent-soft: #2563eb33; --accent-hover: #2563eb1a;
+    --kw: #059669; --pill-fg: #ffffff; --desc-bg: #f8fafc; --desc-text: #334155;
+    --shadow-card: rgba(15, 23, 42, 0.08); --modal-shadow: rgba(15, 23, 42, 0.2); --backdrop: rgba(100, 116, 139, 0.4);
+    --del-hover-bg: #fee2e2; --del-hover-border: #ef4444; --del-hover-fg: #b91c1c;
+    --icon-bg: #fee2e2; --icon-fg: #b91c1c;
+  }}
+
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; }}
+  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; transition: background 0.2s, color 0.2s; }}
 
   h1 {{ font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem; }}
-  .subtitle {{ color: #94a3b8; margin-bottom: 2rem; }}
+  .subtitle {{ color: var(--muted); margin-bottom: 2rem; }}
+
+  .theme-btn {{ position: fixed; top: 1.1rem; right: 1.1rem; background: var(--card); border: 1px solid var(--border2);
+                color: var(--muted); border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 15px;
+                display: flex; align-items: center; justify-content: center; z-index: 100; transition: all 0.15s; }}
+  .theme-btn:hover {{ color: var(--text); border-color: var(--accent); }}
 
   /* Summary cards */
   .summary {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2.5rem; }}
-  .stat-card {{ background: #1e293b; border-radius: 12px; padding: 1.25rem; }}
+  .stat-card {{ background: var(--card); border-radius: 12px; padding: 1.25rem; }}
   .stat-num {{ font-size: 2rem; font-weight: 700; }}
-  .stat-label {{ color: #94a3b8; font-size: 0.85rem; margin-top: 0.25rem; }}
+  .stat-label {{ color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }}
   .stat-ok .stat-num {{ color: #10b981; }}
-  .stat-scored .stat-num {{ color: #60a5fa; }}
+  .stat-scored .stat-num {{ color: #3b82f6; }}
   .stat-high .stat-num {{ color: #f59e0b; }}
-  .stat-total .stat-num {{ color: #e2e8f0; }}
+  .stat-total .stat-num {{ color: var(--text); }}
 
   /* Filters */
-  .filters {{ background: #1e293b; border-radius: 12px; padding: 1.25rem; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }}
-  .filter-label {{ color: #94a3b8; font-size: 0.85rem; font-weight: 600; }}
-  .filter-btn {{ background: #334155; border: none; color: #94a3b8; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.15s; }}
-  .filter-btn:hover {{ background: #475569; color: #e2e8f0; }}
-  .filter-btn.active {{ background: #60a5fa; color: #0f172a; font-weight: 600; }}
-  .search-input {{ background: #334155; border: 1px solid #475569; color: #e2e8f0; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.8rem; width: 200px; }}
-  .search-input::placeholder {{ color: #64748b; }}
+  .filters {{ background: var(--card); border-radius: 12px; padding: 1.25rem; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }}
+  .filter-label {{ color: var(--muted); font-size: 0.85rem; font-weight: 600; }}
+  .filter-btn {{ background: var(--chip-bg); border: none; color: var(--chip-fg); padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.15s; }}
+  .filter-btn:hover {{ background: var(--border2); color: var(--text); }}
+  .filter-btn.active {{ background: var(--accent); color: var(--accent-fg); font-weight: 600; }}
+  .search-input {{ background: var(--chip-bg); border: 1px solid var(--border2); color: var(--text); padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.8rem; width: 200px; }}
+  .search-input::placeholder {{ color: var(--faint); }}
 
   /* Score distribution */
   .score-section {{ display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2.5rem; }}
-  .score-dist {{ background: #1e293b; border-radius: 12px; padding: 1.5rem; }}
-  .score-dist h3 {{ font-size: 1rem; margin-bottom: 1rem; color: #94a3b8; }}
+  .score-dist {{ background: var(--card); border-radius: 12px; padding: 1.5rem; }}
+  .score-dist h3 {{ font-size: 1rem; margin-bottom: 1rem; color: var(--muted); }}
   .score-row {{ display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }}
   .score-label {{ width: 1.5rem; text-align: right; font-size: 0.85rem; font-weight: 600; }}
-  .score-bar-track {{ flex: 1; height: 14px; background: #334155; border-radius: 4px; overflow: hidden; }}
+  .score-bar-track {{ flex: 1; height: 14px; background: var(--border); border-radius: 4px; overflow: hidden; }}
   .score-bar-fill {{ height: 100%; border-radius: 4px; transition: width 0.3s; }}
-  .score-count {{ width: 2.5rem; font-size: 0.8rem; color: #94a3b8; }}
+  .score-count {{ width: 2.5rem; font-size: 0.8rem; color: var(--muted); }}
 
   /* Site bars */
-  .sites-section {{ background: #1e293b; border-radius: 12px; padding: 1.5rem; }}
-  .sites-section h3 {{ font-size: 1rem; margin-bottom: 1rem; color: #94a3b8; }}
+  .sites-section {{ background: var(--card); border-radius: 12px; padding: 1.5rem; }}
+  .sites-section h3 {{ font-size: 1rem; margin-bottom: 1rem; color: var(--muted); }}
   .site-row {{ margin-bottom: 0.8rem; }}
   .site-name {{ font-weight: 600; font-size: 0.9rem; }}
-  .site-nums {{ color: #94a3b8; font-size: 0.75rem; margin: 0.15rem 0; }}
-  .bar-track {{ height: 8px; background: #334155; border-radius: 4px; display: flex; overflow: hidden; }}
+  .site-nums {{ color: var(--muted); font-size: 0.75rem; margin: 0.15rem 0; }}
+  .bar-track {{ height: 8px; background: var(--border); border-radius: 4px; display: flex; overflow: hidden; }}
   .bar-fill {{ height: 100%; transition: width 0.3s; }}
 
   /* Score group headers */
   .score-header {{ font-size: 1.2rem; font-weight: 600; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 3px solid; display: flex; align-items: center; gap: 0.75rem; }}
-  .score-badge {{ display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 8px; color: #0f172a; font-weight: 700; font-size: 1rem; }}
+  .score-badge {{ display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 8px; color: var(--pill-fg); font-weight: 700; font-size: 1rem; }}
 
   /* Job grid */
   .job-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1rem; }}
 
-  .job-card {{ background: #1e293b; border-radius: 10px; padding: 1rem; border-left: 3px solid #334155; transition: all 0.15s; }}
-  .job-card:hover {{ transform: translateY(-2px); box-shadow: 0 4px 12px #00000044; }}
+  .job-card {{ background: var(--card); border-radius: 10px; padding: 1rem; border-left: 3px solid var(--border); transition: all 0.15s; }}
+  .job-card:hover {{ transform: translateY(-2px); box-shadow: 0 4px 12px var(--shadow-card); }}
   .job-card[data-score="9"], .job-card[data-score="10"] {{ border-left-color: #10b981; }}
   .job-card[data-score="8"] {{ border-left-color: #34d399; }}
   .job-card[data-score="7"] {{ border-left-color: #60a5fa; }}
@@ -263,62 +287,62 @@ def generate_dashboard(output_path: str | None = None) -> str:
   .job-card[data-score="5"] {{ border-left-color: #f59e0b88; }}
 
   .card-header {{ display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }}
-  .del-btn {{ margin-left: auto; background: transparent; border: 1px solid #475569; color: #94a3b8;
+  .del-btn {{ margin-left: auto; background: transparent; border: 1px solid var(--border2); color: var(--muted);
               border-radius: 6px; width: 22px; height: 22px; line-height: 1; cursor: pointer;
               font-size: 12px; flex-shrink: 0; }}
-  .del-btn:hover {{ background: #7f1d1d; border-color: #ef4444; color: #fecaca; }}
+  .del-btn:hover {{ background: var(--del-hover-bg); border-color: var(--del-hover-border); color: var(--del-hover-fg); }}
 
   /* Confirm modal (dashboard-styled replacement for window.confirm) */
-  .modal-backdrop {{ position: fixed; inset: 0; background: rgba(15, 23, 42, 0.72);
+  .modal-backdrop {{ position: fixed; inset: 0; background: var(--backdrop);
                     backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
                     display: none; align-items: center; justify-content: center; z-index: 1000; }}
   .modal-backdrop.visible {{ display: flex; }}
-  .modal {{ background: #1e293b; border: 1px solid #334155; border-radius: 14px;
+  .modal {{ background: var(--card); border: 1px solid var(--border); border-radius: 14px;
             max-width: 400px; width: calc(100% - 2rem); padding: 1.4rem;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 20px 50px var(--modal-shadow);
             animation: modalIn 0.16s ease-out; }}
   @keyframes modalIn {{ from {{ opacity: 0; transform: translateY(8px) scale(0.97); }}
                         to {{ opacity: 1; transform: none; }} }}
-  .modal-title {{ font-size: 1rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.6rem;
+  .modal-title {{ font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 0.6rem;
                   display: flex; align-items: center; gap: 0.6rem; }}
-  .modal-icon {{ width: 30px; height: 30px; border-radius: 8px; background: #7f1d1d; color: #fca5a5;
+  .modal-icon {{ width: 30px; height: 30px; border-radius: 8px; background: var(--icon-bg); color: var(--icon-fg);
                  display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px; }}
-  .modal-text {{ color: #94a3b8; font-size: 0.88rem; line-height: 1.5; margin-bottom: 1.2rem; }}
+  .modal-text {{ color: var(--muted); font-size: 0.88rem; line-height: 1.5; margin-bottom: 1.2rem; }}
   .modal-btns {{ display: flex; gap: 0.6rem; justify-content: flex-end; }}
   .btn {{ border-radius: 8px; padding: 0.5rem 1.1rem; font-size: 0.85rem; font-weight: 600;
           cursor: pointer; border: 1px solid transparent; font-family: inherit; }}
   .btn-danger {{ background: #dc2626; color: #fff; }}
   .btn-danger:hover {{ background: #ef4444; }}
-  .btn-ghost {{ background: transparent; border-color: #475569; color: #94a3b8; }}
-  .btn-ghost:hover {{ background: #334155; color: #e2e8f0; }}
-  .score-pill {{ display: inline-flex; align-items: center; justify-content: center; min-width: 1.6rem; height: 1.6rem; border-radius: 6px; color: #0f172a; font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }}
+  .btn-ghost {{ background: transparent; border-color: var(--border2); color: var(--muted); }}
+  .btn-ghost:hover {{ background: var(--border); color: var(--text); }}
+  .score-pill {{ display: inline-flex; align-items: center; justify-content: center; min-width: 1.6rem; height: 1.6rem; border-radius: 6px; color: var(--pill-fg); font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }}
 
-  .job-title {{ color: #e2e8f0; text-decoration: none; font-weight: 600; font-size: 0.95rem; }}
-  .job-title:hover {{ color: #60a5fa; }}
+  .job-title {{ color: var(--text); text-decoration: none; font-weight: 600; font-size: 0.95rem; }}
+  .job-title:hover {{ color: var(--accent); }}
 
   .meta-row {{ display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.4rem; }}
-  .meta-tag {{ font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: #334155; color: #94a3b8; }}
+  .meta-tag {{ font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: var(--chip-bg); color: var(--chip-fg); }}
   .meta-tag.salary {{ background: #064e3b; color: #6ee7b7; }}
   .meta-tag.location {{ background: #1e3a5f; color: #93c5fd; }}
 
-  .keywords-row {{ font-size: 0.75rem; color: #10b981; margin-bottom: 0.3rem; line-height: 1.4; }}
-  .reasoning-row {{ font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem; font-style: italic; line-height: 1.4; }}
+  .keywords-row {{ font-size: 0.75rem; color: var(--kw); margin-bottom: 0.3rem; line-height: 1.4; }}
+  .reasoning-row {{ font-size: 0.75rem; color: var(--muted); margin-bottom: 0.5rem; font-style: italic; line-height: 1.4; }}
 
-  .desc-preview {{ font-size: 0.8rem; color: #64748b; line-height: 1.5; margin-bottom: 0.75rem; max-height: 3.6em; overflow: hidden; }}
+  .desc-preview {{ font-size: 0.8rem; color: var(--faint); line-height: 1.5; margin-bottom: 0.75rem; max-height: 3.6em; overflow: hidden; }}
 
   .card-footer {{ display: flex; justify-content: flex-end; }}
-  .apply-link {{ font-size: 0.8rem; color: #60a5fa; text-decoration: none; padding: 0.3rem 0.8rem; border: 1px solid #60a5fa33; border-radius: 6px; font-weight: 500; }}
-  .apply-link:hover {{ background: #60a5fa22; }}
+  .apply-link {{ font-size: 0.8rem; color: var(--accent); text-decoration: none; padding: 0.3rem 0.8rem; border: 1px solid var(--accent-soft); border-radius: 6px; font-weight: 500; }}
+  .apply-link:hover {{ background: var(--accent-hover); }}
 
   /* Expandable full description */
   .full-desc-details {{ margin-bottom: 0.75rem; }}
-  .expand-btn {{ font-size: 0.8rem; color: #60a5fa; cursor: pointer; list-style: none; padding: 0.3rem 0; }}
+  .expand-btn {{ font-size: 0.8rem; color: var(--accent); cursor: pointer; list-style: none; padding: 0.3rem 0; }}
   .expand-btn::-webkit-details-marker {{ display: none; }}
-  .expand-btn:hover {{ color: #93c5fd; }}
-  .full-desc {{ font-size: 0.8rem; color: #cbd5e1; line-height: 1.6; margin-top: 0.5rem; padding: 0.75rem; background: #0f172a; border-radius: 8px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }}
+  .expand-btn:hover {{ color: var(--accent); opacity: 0.8; }}
+  .full-desc {{ font-size: 0.8rem; color: var(--desc-text); line-height: 1.6; margin-top: 0.5rem; padding: 0.75rem; background: var(--desc-bg); border-radius: 8px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }}
 
   .hidden {{ display: none !important; }}
-  .job-count {{ color: #94a3b8; font-size: 0.85rem; margin-bottom: 1rem; }}
+  .job-count {{ color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }}
 
   @media (max-width: 768px) {{
     .summary {{ grid-template-columns: repeat(2, 1fr); }}
@@ -327,8 +351,17 @@ def generate_dashboard(output_path: str | None = None) -> str:
     body {{ padding: 1rem; }}
   }}
 </style>
+<script>
+(function() {{
+  var saved = localStorage.getItem('dash-theme');
+  var theme = saved || (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  document.documentElement.dataset.theme = theme;
+}})();
+</script>
 </head>
 <body>
+
+<button class="theme-btn" id="theme-toggle" type="button" title="Toggle light / dark theme">&#9789;</button>
 
 <h1>ApplyPilot Dashboard</h1>
 <p class="subtitle">{total} jobs &middot; {scored} scored &middot; {high_fit} strong matches (7+)</p>
@@ -498,6 +531,27 @@ document.addEventListener('click', e => {{
     }}
   }}
 }});
+
+// ── Theme toggle ─────────────────────────────────────────────────────
+const themeBtn = document.getElementById('theme-toggle');
+function paintThemeBtn() {{
+  themeBtn.innerHTML = document.documentElement.dataset.theme === 'light' ? '&#9790;' : '&#9788;';
+}}
+themeBtn.addEventListener('click', () => {{
+  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('dash-theme', next);
+  paintThemeBtn();
+}});
+// follow system theme changes unless the user picked manually
+const mq = window.matchMedia('(prefers-color-scheme: light)');
+mq.addEventListener('change', e => {{
+  if (!localStorage.getItem('dash-theme')) {{
+    document.documentElement.dataset.theme = e.matches ? 'light' : 'dark';
+    paintThemeBtn();
+  }}
+}});
+paintThemeBtn();
 </script>
 
 <div class="modal-backdrop" id="confirm-modal">
