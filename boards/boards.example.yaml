@@ -1,0 +1,25 @@
+# ATS board tokens for applypilot-boards. Copy to ~/.applypilot/boards.yaml
+# and extend as you find new boards (a company's careers page URL usually
+# contains its token: job-boards.greenhouse.io/<token> or jobs.lever.co/<token>).
+greenhouse:
+  - duolingo
+  - figma
+  - cloudflare
+  - anthropic
+  - discord
+  - datadog
+  - mongodb
+  - netlify
+  - vercel
+  - planetscale
+  - mixpanel
+  - monzo
+  - peloton
+  - robinhood
+  - gusto
+  - launchdarkly
+  - fivetran
+  - asana
+lever:
+  - mistral
+  - kraken

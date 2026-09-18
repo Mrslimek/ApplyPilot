@@ -84,6 +84,7 @@ func projectDir() string {
 }
 
 func applypilotBin() string { return filepath.Join(projectDir(), ".venv", "bin", "applypilot") }
+func boardsBin() string    { return filepath.Join(projectDir(), "boards", "applypilot-boards") }
 func runCycleSh() string    { return filepath.Join(projectDir(), "run_cycle.sh") }
 func queuePy() string       { return filepath.Join(projectDir(), "bot", "queue.py") }
 func venvPython() string    { return filepath.Join(projectDir(), ".venv", "bin", "python") }
@@ -232,6 +233,7 @@ func clip(s string, n int) string {
 var helpText = strings.Join([]string{
 	"ApplyPilot control",
 	"/run — refresh cycle (discover→cover)",
+	"/boards — harvest remote/ATS job boards now",
 	"/status — pipeline stats",
 	"/queue — ready for auto-apply",
 	"/apply N — submit N applications (confirm by repeat)",
@@ -378,6 +380,8 @@ func handle(cfg *config, msg tgMessage) {
 		send(*cfg, chatID, helpText)
 	case cmd == "/run":
 		send(*cfg, chatID, cmdRun(*cfg, chatID))
+	case cmd == "/boards":
+		send(*cfg, chatID, "<pre>"+clip(runCmd(240, boardsBin()), 3500)+"</pre>")
 	case cmd == "/status":
 		send(*cfg, chatID, "<pre>"+clip(runCmd(60, applypilotBin(), "status"), 3500)+"</pre>")
 	case cmd == "/queue":

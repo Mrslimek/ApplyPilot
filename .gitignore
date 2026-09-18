@@ -43,3 +43,5 @@ Thumbs.db
 # local tooling artifacts
 uv.lock
 bot/applypilot-bot-linux-*
+boards/applypilot-boards
+boards/applypilot-boards-linux-*

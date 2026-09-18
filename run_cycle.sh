@@ -8,6 +8,7 @@ mkdir -p /root/.applypilot/logs
 exec >> /root/.applypilot/logs/cron.log 2>&1
 echo "========================================================"
 echo "[cycle start] $(date -u '+%Y-%m-%d %H:%M UTC')"
+boards/applypilot-boards
 .venv/bin/applypilot run discover enrich -w 1
 .venv/bin/applypilot run score
 .venv/bin/applypilot run tailor cover
