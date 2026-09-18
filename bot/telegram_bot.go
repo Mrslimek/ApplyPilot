@@ -84,7 +84,13 @@ func projectDir() string {
 }
 
 func applypilotBin() string { return filepath.Join(projectDir(), ".venv", "bin", "applypilot") }
-func boardsBin() string    { return filepath.Join(projectDir(), "boards", "applypilot-boards") }
+func boardsBin() string {
+	p := filepath.Join(projectDir(), "boards", "applypilot-boards-linux-amd64")
+	if _, err := os.Stat(p); err == nil {
+		return p
+	}
+	return filepath.Join(projectDir(), "boards", "applypilot-boards")
+}
 func runCycleSh() string    { return filepath.Join(projectDir(), "run_cycle.sh") }
 func queuePy() string       { return filepath.Join(projectDir(), "bot", "queue.py") }
 func venvPython() string    { return filepath.Join(projectDir(), ".venv", "bin", "python") }
@@ -196,7 +202,11 @@ func runCmd(timeoutSec int, args ...string) string {
 	cmd.Env = append(os.Environ(), "HOME="+os.Getenv("HOME"))
 	done := make(chan string, 1)
 	go func() {
-		out, _ := cmd.CombinedOutput()
+		out, err := cmd.CombinedOutput()
+		if err != nil && len(out) == 0 {
+			done <- fmt.Sprintf("error: %v", err)
+			return
+		}
 		done <- string(out)
 	}()
 	select {
