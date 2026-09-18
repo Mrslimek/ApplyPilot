@@ -8,6 +8,7 @@ search configuration YAML (searches.yaml) rather than being hardcoded.
 """
 
 import logging
+import re
 import sqlite3
 import time
 from datetime import datetime, timezone
@@ -77,45 +78,54 @@ def _scrape_with_retry(kwargs: dict, max_retries: int = 2, backoff: float = 5.0)
 # -- Location filtering ------------------------------------------------------
 
 def _load_location_config(search_cfg: dict) -> tuple[list[str], list[str]]:
-    """Extract accept/reject location lists from search config.
+    """Extract the reject blacklist from search config.
 
-    Falls back to sensible defaults if not defined in the YAML.
+    Reads `location_reject` (new key); falls back to the legacy
+    `location_reject_non_remote` key. Returns ([], reject) — the accept
+    whitelist is no longer used.
     """
-    accept = search_cfg.get("location_accept", [])
-    reject = search_cfg.get("location_reject_non_remote", [])
-    return accept, reject
+    reject = search_cfg.get("location_reject") or search_cfg.get("location_reject_non_remote", [])
+    return [], reject
 
 
 def _location_ok(location: str | None, accept: list[str], reject: list[str]) -> bool:
-    """Check if a job location passes the user's location filter.
+    """Check if a job location passes the swamp blacklist.
 
-    Remote jobs are always accepted. Non-remote jobs must match an accept
-    pattern and not match a reject pattern.
+    Keep everything except jobs located in (or remote-scoped to) a
+    reject-list region. Remote postings in reject regions are dropped too —
+    they target the local market. Unknown locations pass; the scorer and
+    the apply-time agent make the final call. `accept` is unused (kept for
+    signature compatibility).
     """
     if not location:
         return True  # unknown location -- keep it, let scorer decide
 
     loc = location.lower()
 
-    # Remote jobs always OK
-    if any(r in loc for r in ("remote", "anywhere", "work from home", "wfh", "distributed")):
-        return True
-
-    # Reject non-remote matches
     for r in reject:
-        if r.lower() in loc:
+        r = r.lower().strip()
+        if r and re.search(rf"\b{re.escape(r)}\b", loc):
             return False
 
-    # Accept matches
-    for a in accept:
-        if a.lower() in loc:
-            return True
-
-    # No match -- reject unknown
-    return False
+    return True
 
 
 # -- DB storage (JobSpy DataFrame -> SQLite) ---------------------------------
+
+def _clean_field(value) -> str | None:
+    """Normalize a pandas/jobspy cell to a clean string or None.
+
+    Handles both float NaN (numeric columns become "nan") and Python None
+    in object columns (str(None) == "None"), which previously leaked the
+    literal string "None" into the DB.
+    """
+    if value is None:
+        return None
+    s = str(value).strip()
+    if s in ("", "nan", "None", "none", "<NA>"):
+        return None
+    return s
+
 
 def store_jobspy_results(conn: sqlite3.Connection, df, source_label: str) -> tuple[int, int]:
     """Store JobSpy DataFrame results into the DB. Returns (new, existing)."""
@@ -124,13 +134,13 @@ def store_jobspy_results(conn: sqlite3.Connection, df, source_label: str) -> tup
     existing = 0
 
     for _, row in df.iterrows():
-        url = str(row.get("job_url", ""))
-        if not url or url == "nan":
+        url = _clean_field(row.get("job_url"))
+        if not url:
             continue
 
-        title = str(row.get("title", "")) if str(row.get("title", "")) != "nan" else None
-        company = str(row.get("company", "")) if str(row.get("company", "")) != "nan" else None
-        location_str = str(row.get("location", "")) if str(row.get("location", "")) != "nan" else None
+        title = _clean_field(row.get("title"))
+        company = _clean_field(row.get("company"))
+        location_str = _clean_field(row.get("location"))
 
         # Build salary string from min/max
         salary = None
@@ -146,7 +156,7 @@ def store_jobspy_results(conn: sqlite3.Connection, df, source_label: str) -> tup
             if interval:
                 salary += f"/{interval}"
 
-        description = str(row.get("description", "")) if str(row.get("description", "")) != "nan" else None
+        description = _clean_field(row.get("description"))
         site_name = str(row.get("site", source_label))
         is_remote = row.get("is_remote", False)
 
@@ -164,7 +174,7 @@ def store_jobspy_results(conn: sqlite3.Connection, df, source_label: str) -> tup
             detail_scraped_at = now
 
         # Extract apply URL if JobSpy provided it
-        apply_url = str(row.get("job_url_direct", "")) if str(row.get("job_url_direct", "")) != "nan" else None
+        apply_url = _clean_field(row.get("job_url_direct"))
 
         try:
             conn.execute(

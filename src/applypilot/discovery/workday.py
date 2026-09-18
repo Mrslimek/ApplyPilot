@@ -41,34 +41,31 @@ def load_employers() -> dict:
 # -- Location filtering from search config -----------------------------------
 
 def _load_location_filter(search_cfg: dict | None = None):
-    """Load location accept/reject lists from search config."""
+    """Load the location reject blacklist from search config."""
     if search_cfg is None:
         search_cfg = config.load_search_config()
 
-    accept = search_cfg.get("location_accept", [])
-    reject = search_cfg.get("location_reject_non_remote", [])
-    return accept, reject
+    reject = search_cfg.get("location_reject") or search_cfg.get("location_reject_non_remote", [])
+    return [], reject
 
 
 def _location_ok(location: str | None, accept: list[str], reject: list[str]) -> bool:
-    """Check if a job location passes the user's location filter."""
+    """Check if a job location passes the swamp blacklist.
+
+    Keep everything except reject-list regions (including remote postings
+    scoped there — they target the local market). `accept` unused.
+    """
     if not location:
         return True
 
     loc = location.lower()
 
-    if any(r in loc for r in ("remote", "anywhere", "work from home", "wfh", "distributed")):
-        return True
-
     for r in reject:
-        if r.lower() in loc:
+        r = r.lower().strip()
+        if r and re.search(rf"\b{re.escape(r)}\b", loc):
             return False
 
-    for a in accept:
-        if a.lower() in loc:
-            return True
-
-    return False
+    return True
 
 
 # -- HTML stripper -----------------------------------------------------------
