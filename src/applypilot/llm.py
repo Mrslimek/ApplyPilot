@@ -157,12 +157,16 @@ class LLMClient:
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
-        payload = {
+        payload: dict = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        # GLM hybrid-thinking models: disable chain-of-thought for structured
+        # tasks (same intent as the /no_think hack for Qwen below).
+        if "glm" in self.model.lower():
+            payload["thinking"] = {"type": "disabled"}
 
         resp = self._client.post(
             f"{self.base_url}/chat/completions",
@@ -181,7 +185,13 @@ class LLMClient:
     def _handle_compat_response(resp: httpx.Response) -> str:
         resp.raise_for_status()
         data = resp.json()
-        return data["choices"][0]["message"]["content"]
+        content = data["choices"][0]["message"]["content"]
+        # Some OpenAI-compat backends inline chain-of-thought as <think> tags
+        # even when reasoning is disabled — strip it before downstream JSON parsing.
+        if content and "<think>" in content:
+            import re
+            content = re.sub(r"<think>.*?</think>\s*", "", content, flags=re.DOTALL)
+        return content
 
     # -- public API ---------------------------------------------------------
 
