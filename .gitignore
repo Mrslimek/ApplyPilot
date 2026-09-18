@@ -39,3 +39,7 @@ Thumbs.db
 
 # Claude Code
 .claude/
+
+# local tooling artifacts
+uv.lock
+bot/applypilot-bot-linux-*
