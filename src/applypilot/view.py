@@ -267,6 +267,30 @@ def generate_dashboard(output_path: str | None = None) -> str:
               border-radius: 6px; width: 22px; height: 22px; line-height: 1; cursor: pointer;
               font-size: 12px; flex-shrink: 0; }}
   .del-btn:hover {{ background: #7f1d1d; border-color: #ef4444; color: #fecaca; }}
+
+  /* Confirm modal (dashboard-styled replacement for window.confirm) */
+  .modal-backdrop {{ position: fixed; inset: 0; background: rgba(15, 23, 42, 0.72);
+                    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+                    display: none; align-items: center; justify-content: center; z-index: 1000; }}
+  .modal-backdrop.visible {{ display: flex; }}
+  .modal {{ background: #1e293b; border: 1px solid #334155; border-radius: 14px;
+            max-width: 400px; width: calc(100% - 2rem); padding: 1.4rem;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            animation: modalIn 0.16s ease-out; }}
+  @keyframes modalIn {{ from {{ opacity: 0; transform: translateY(8px) scale(0.97); }}
+                        to {{ opacity: 1; transform: none; }} }}
+  .modal-title {{ font-size: 1rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.6rem;
+                  display: flex; align-items: center; gap: 0.6rem; }}
+  .modal-icon {{ width: 30px; height: 30px; border-radius: 8px; background: #7f1d1d; color: #fca5a5;
+                 display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px; }}
+  .modal-text {{ color: #94a3b8; font-size: 0.88rem; line-height: 1.5; margin-bottom: 1.2rem; }}
+  .modal-btns {{ display: flex; gap: 0.6rem; justify-content: flex-end; }}
+  .btn {{ border-radius: 8px; padding: 0.5rem 1.1rem; font-size: 0.85rem; font-weight: 600;
+          cursor: pointer; border: 1px solid transparent; font-family: inherit; }}
+  .btn-danger {{ background: #dc2626; color: #fff; }}
+  .btn-danger:hover {{ background: #ef4444; }}
+  .btn-ghost {{ background: transparent; border-color: #475569; color: #94a3b8; }}
+  .btn-ghost:hover {{ background: #334155; color: #e2e8f0; }}
   .score-pill {{ display: inline-flex; align-items: center; justify-content: center; min-width: 1.6rem; height: 1.6rem; border-radius: 6px; color: #0f172a; font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }}
 
   .job-title {{ color: #e2e8f0; text-decoration: none; font-weight: 600; font-size: 0.95rem; }}
@@ -411,14 +435,55 @@ function deleteJob(url) {{
     headers: {{'Content-Type': 'application/json'}},
     body: JSON.stringify({{url: url}})
   }})
-  .then(r => r.ok ? removeCard(url) : alert('Delete failed (HTTP ' + r.status + ')'))
-  .catch(() => alert('Delete failed'));
+  .then(r => {{
+    if (r.ok) {{ removeCard(url); }}
+    else {{ showModal({{title: 'Delete failed', text: 'Server returned HTTP ' + r.status + '.', dangerOnly: true}}); }}
+  }})
+  .catch(() => showModal({{title: 'Delete failed', text: 'Could not reach the server. Is the SSH tunnel up?', dangerOnly: true}}));
+}}
+// Styled confirm dialog (matches the dashboard theme)
+function showModal(opts) {{
+  return new Promise(resolve => {{
+    const bd = document.getElementById('confirm-modal');
+    const panel = bd.querySelector('.modal');
+    bd.querySelector('.modal-title span').textContent = opts.title || 'Are you sure?';
+    bd.querySelector('.modal-text').textContent = opts.text || '';
+    const okBtn = bd.querySelector('.btn-danger');
+    const cancelBtn = bd.querySelector('.btn-ghost');
+    okBtn.textContent = opts.confirmLabel || 'Delete';
+    okBtn.style.display = opts.dangerOnly ? 'none' : '';
+    function close(v) {{
+      bd.classList.remove('visible');
+      okBtn.onclick = cancelBtn.onclick = bd.onclick = null;
+      document.removeEventListener('keydown', onKey);
+      resolve(v);
+    }}
+    function onKey(e) {{
+      if (e.key === 'Escape') close(false);
+      if (e.key === 'Enter') close(!!opts.dangerOnly ? true : false);
+    }}
+    okBtn.onclick = () => close(true);
+    cancelBtn.onclick = () => close(false);
+    bd.onclick = e => {{ if (e.target === bd) close(false); }};
+    document.addEventListener('keydown', onKey);
+    bd.classList.add('visible');
+    cancelBtn.focus();
+    panel.setAttribute('aria-label', opts.title || 'Confirm');
+  }});
+}}
+async function askDelete(card, title, text) {{
+  const jobTitle = (card.querySelector('.job-title') || {{}}).textContent || 'this job';
+  const t = (jobTitle || 'this job').trim();
+  if (await showModal({{title: title, text: text.replace('{{JOB}}', t.slice(0, 80))}})) {{
+    deleteJob(card.dataset.url);
+  }}
 }}
 document.addEventListener('click', e => {{
   const delBtn = e.target.closest('.del-btn');
   if (delBtn) {{
     const card = delBtn.closest('.job-card');
-    if (card && confirm('Delete this job from ApplyPilot?')) deleteJob(card.dataset.url);
+    if (card) askDelete(card, 'Delete this job?',
+      'Remove "{{JOB}}" from ApplyPilot? Its tailored resume and cover letter will be deleted too. This job will not be tracked again.');
     return;
   }}
   const link = e.target.closest('a.job-title, a.apply-link');
@@ -427,12 +492,27 @@ document.addEventListener('click', e => {{
     if (card) {{
       // The job opens in a new tab; afterwards ask whether to drop it here.
       setTimeout(() => {{
-        if (confirm('Remove this job from the list? (e.g. you already applied)')) deleteJob(card.dataset.url);
+        askDelete(card, 'Already applied?',
+          'Remove "{{JOB}}" from the list? The job stays open in the other tab — this only cleans up your ApplyPilot board.');
       }}, 1500);
     }}
   }}
 }});
 </script>
+
+<div class="modal-backdrop" id="confirm-modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Confirm">
+    <div class="modal-title">
+      <div class="modal-icon">&#10005;</div>
+      <span>Are you sure?</span>
+    </div>
+    <div class="modal-text"></div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" type="button">Cancel</button>
+      <button class="btn btn-danger" type="button">Delete</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>"""
