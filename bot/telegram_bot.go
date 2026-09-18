@@ -391,7 +391,11 @@ func handle(cfg *config, msg tgMessage) {
 	case cmd == "/run":
 		send(*cfg, chatID, cmdRun(*cfg, chatID))
 	case cmd == "/boards":
-		send(*cfg, chatID, "<pre>"+clip(runCmd(240, boardsBin()), 3500)+"</pre>")
+		send(*cfg, chatID, "⏳ harvesting job boards (1-5 min) — I'll send the report when done")
+		go func() {
+			out := runCmd(360, boardsBin())
+			send(*cfg, chatID, "<pre>"+clip(out, 3500)+"</pre>")
+		}()
 	case cmd == "/status":
 		send(*cfg, chatID, "<pre>"+clip(runCmd(60, applypilotBin(), "status"), 3500)+"</pre>")
 	case cmd == "/queue":
