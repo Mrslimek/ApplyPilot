@@ -34,9 +34,21 @@ IMPORTANT FACTORS:
 - Consider transferable experience (automation, scripting, API work)
 - Factor in the candidate's project experience
 - Be realistic about experience level vs. job requirements (years of experience, seniority)
+- Respect the candidate's target role: it defines their PRIMARY stack. A vacancy
+  centered on a different primary language or stack is a weaker fit even if that
+  stack appears among the candidate's skills.
+
+WORK ARRANGEMENT (CRITICAL — the candidate wants REMOTE ONLY):
+- REMOTE: yes = fully remote, remote-first, "remote OK"/"remote option available",
+  or work-from-anywhere. Region-limited remote (e.g. "Remote in Europe",
+  "Remote — EMEA") ALSO counts as yes.
+- REMOTE: no = onsite-only, or hybrid requiring regular office presence with no
+  remote option. Such jobs MUST score 1-2 regardless of how good the stack match is.
+- REMOTE: unknown = the posting does not state the arrangement clearly.
 
 RESPOND IN EXACTLY THIS FORMAT (no other text):
 SCORE: [1-10]
+REMOTE: [yes|no|unknown]
 KEYWORDS: [comma-separated ATS keywords from the job description that match or could match the candidate]
 REASONING: [2-3 sentences explaining the score]"""
 
@@ -48,9 +60,10 @@ def _parse_score_response(response: str) -> dict:
         response: Raw LLM response text.
 
     Returns:
-        {"score": int, "keywords": str, "reasoning": str}
+        {"score": int, "remote": "yes"|"no"|"unknown", "keywords": str, "reasoning": str}
     """
     score = 0
+    remote = "unknown"
     keywords = ""
     reasoning = response
 
@@ -62,12 +75,36 @@ def _parse_score_response(response: str) -> dict:
                 score = max(1, min(10, score))
             except (AttributeError, ValueError):
                 score = 0
+        elif line.startswith("REMOTE:"):
+            val = line.replace("REMOTE:", "").strip().lower()
+            if val in ("yes", "no"):
+                remote = val
         elif line.startswith("KEYWORDS:"):
             keywords = line.replace("KEYWORDS:", "").strip()
         elif line.startswith("REASONING:"):
             reasoning = line.replace("REASONING:", "").strip()
 
-    return {"score": score, "keywords": keywords, "reasoning": reasoning}
+    # Hard cap: non-remote jobs never pass the fit threshold, whatever the
+    # model said about stack match (candidate wants remote only).
+    if remote == "no" and score > 2:
+        score = 2
+
+    return {"score": score, "remote": remote, "keywords": keywords, "reasoning": reasoning}
+
+
+_target_role_cache: str | None = None
+
+
+def _get_target_role() -> str:
+    """Candidate's target role from profile.json (cached)."""
+    global _target_role_cache
+    if _target_role_cache is None:
+        try:
+            profile = load_profile()
+            _target_role_cache = profile.get("experience", {}).get("target_role", "") or ""
+        except Exception:
+            _target_role_cache = ""
+    return _target_role_cache
 
 
 def score_job(resume_text: str, job: dict) -> dict:
@@ -87,9 +124,12 @@ def score_job(resume_text: str, job: dict) -> dict:
         f"DESCRIPTION:\n{(job.get('full_description') or '')[:6000]}"
     )
 
+    target_role = _get_target_role()
+    target_line = f"\nCANDIDATE TARGET ROLE (primary stack): {target_role}\n" if target_role else ""
+
     messages = [
         {"role": "system", "content": SCORE_PROMPT},
-        {"role": "user", "content": f"RESUME:\n{resume_text}\n\n---\n\nJOB POSTING:\n{job_text}"},
+        {"role": "user", "content": f"RESUME:\n{resume_text}\n\n---\n{target_line}\nJOB POSTING:\n{job_text}"},
     ]
 
     try:
@@ -155,9 +195,11 @@ def run_scoring(limit: int = 0, rescore: bool = False) -> dict:
     # Write scores to DB
     now = datetime.now(timezone.utc).isoformat()
     for r in results:
+        remote = r.get("remote", "unknown")
+        remote_ok = 1 if remote == "yes" else (0 if remote == "no" else None)
         conn.execute(
-            "UPDATE jobs SET fit_score = ?, score_reasoning = ?, scored_at = ? WHERE url = ?",
-            (r["score"], f"{r['keywords']}\n{r['reasoning']}", now, r["url"]),
+            "UPDATE jobs SET fit_score = ?, remote_ok = ?, score_reasoning = ?, scored_at = ? WHERE url = ?",
+            (r["score"], remote_ok, f"{r['keywords']}\n{r['reasoning']}", now, r["url"]),
         )
     conn.commit()
 
