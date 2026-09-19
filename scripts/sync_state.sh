@@ -20,6 +20,10 @@ import json, sqlite3
 rows = json.load(open("/tmp/state_results.json"))
 conn = sqlite3.connect("/root/.applypilot/applypilot.db")
 for r in rows:
+    # upsert: history rows may not exist on this side yet
+    conn.execute("""INSERT OR IGNORE INTO jobs (url, applied_at, apply_status)
+                    VALUES (?,?,?)""",
+                 (r["url"], r["applied_at"], r["apply_status"]))
     conn.execute("""UPDATE jobs SET applied_at=?, apply_status=?, apply_error=?,
                     apply_attempts=?, apply_duration_ms=?, apply_report=? WHERE url=?""",
                  (r["applied_at"], r["apply_status"], r["apply_error"], r["apply_attempts"],
