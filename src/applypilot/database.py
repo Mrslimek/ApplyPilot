@@ -143,6 +143,22 @@ def init_db(db_path: Path | str | None = None) -> sqlite3.Connection:
             dismissed_at TEXT
         )
     """)
+
+    # Screening questions the agent could not answer confidently. Populated
+    # from apply runs (status='pending'), answered via the Telegram bot
+    # (status='answered'); known answers are injected into future prompts.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS screening_answers (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            question    TEXT UNIQUE,
+            options     TEXT,
+            answer      TEXT,
+            job_url     TEXT,
+            status      TEXT DEFAULT 'pending',
+            created_at  TEXT,
+            answered_at TEXT
+        )
+    """)
     conn.commit()
 
     # Run migrations for any columns added after initial schema

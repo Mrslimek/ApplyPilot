@@ -247,6 +247,8 @@ var helpText = strings.Join([]string{
 	"/crossmatch — link LinkedIn jobs to ATS apply URLs",
 	"/status — pipeline stats",
 	"/queue — ready for auto-apply",
+	"/questions — screening questions awaiting your answers",
+	"/answer N text — answer a collected question",
 	"/apply N — submit N applications (confirm by repeat)",
 	"/log — tail cycle log",
 	"/cancel — stop everything",
@@ -401,6 +403,16 @@ func handle(cfg *config, msg tgMessage) {
 		send(*cfg, chatID, "⚠️ Crossmatch needs a browser; this VPS's disk can't handle Chrome "+
 			"without freezing. Run it from the Mac:\n"+
 			"<code>APPLYPILOT_DIR=~/.applypilot applypilot crossmatch</code>")
+	case cmd == "/questions":
+		out := runCmd(30, venvPython(), filepath.Join(projectDir(), "bot", "questions.py"), "list")
+		send(*cfg, chatID, "<b>Screening questions:</b>\n<pre>"+clip(out, 3500)+"</pre>"+"\nAnswer with: /answer &lt;id&gt; &lt;text&gt;")
+	case cmd == "/answer":
+		if len(parts) < 3 {
+			send(*cfg, chatID, "usage: /answer <id> <text>")
+			return
+		}
+		out := runCmd(30, append([]string{venvPython(), filepath.Join(projectDir(), "bot", "questions.py"), "answer"}, parts[1:]...)...)
+		send(*cfg, chatID, "<pre>"+clip(out, 1000)+"</pre>")
 	case cmd == "/status":
 		send(*cfg, chatID, "<pre>"+clip(runCmd(60, applypilotBin(), "status"), 3500)+"</pre>")
 	case cmd == "/queue":

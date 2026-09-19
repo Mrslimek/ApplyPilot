@@ -307,6 +307,47 @@ def reset_failed() -> int:
 # Per-job execution
 # ---------------------------------------------------------------------------
 
+def _load_known_answers() -> list[tuple[str, str]]:
+    """User-verified screening answers (status='answered') for the prompt."""
+    try:
+        conn = get_connection()
+        rows = conn.execute(
+            "SELECT question, answer FROM screening_answers "
+            "WHERE status = 'answered' AND answer IS NOT NULL AND answer != ''"
+        ).fetchall()
+        return [(r[0], r[1]) for r in rows]
+    except Exception:
+        return []
+
+
+def _save_unanswered(output: str, job_url: str | None) -> int:
+    """Parse the agent's UNANSWERED_QUESTIONS block and store pending rows."""
+    m = re.search(r"UNANSWERED_QUESTIONS:\s*\n(.*?)(?:\n\s*RESULT:|$)", output, re.DOTALL)
+    if not m:
+        return 0
+    saved = 0
+    now = datetime.now(timezone.utc).isoformat()
+    conn = get_connection()
+    for block in m.group(1).split("---"):
+        qm = re.search(r"Q:\s*(.+)", block)
+        if not qm:
+            continue
+        question = qm.group(1).strip()[:300]
+        om = re.search(r"OPTIONS:\s*(.*)", block)
+        options = (om.group(1).strip()[:300] if om else "") or None
+        try:
+            conn.execute(
+                "INSERT OR IGNORE INTO screening_answers (question, options, job_url, status, created_at) "
+                "VALUES (?, ?, ?, 'pending', ?)",
+                (question, options, job_url, now),
+            )
+            saved += 1
+        except Exception as e:
+            logger.warning("could not save unanswered question: %s", e)
+    conn.commit()
+    return saved
+
+
 def run_job(job: dict, port: int, worker_id: int = 0,
             model: str = "sonnet", dry_run: bool = False) -> tuple[str, int]:
     """Spawn a Claude Code session for one job application.
@@ -328,6 +369,7 @@ def run_job(job: dict, port: int, worker_id: int = 0,
         job=job,
         tailored_resume=resume_text,
         dry_run=dry_run,
+        known_answers=_load_known_answers(),
     )
 
     # Write per-worker MCP config
@@ -464,6 +506,15 @@ def run_job(job: dict, port: int, worker_id: int = 0,
         output = "\n".join(text_parts)
         elapsed = int(time.time() - start)
         duration_ms = int((time.time() - start) * 1000)
+
+        # Collect screening questions the agent could not answer — the user
+        # answers them via the Telegram bot (/questions, /answer).
+        try:
+            n_new = _save_unanswered(output, job.get("url"))
+            if n_new:
+                add_event(f"[W{worker_id}] {n_new} question(s) await your answer (/questions)")
+        except Exception as e:
+            logger.warning("unanswered-questions collection failed: %s", e)
 
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         job_log = config.LOG_DIR / f"claude_{ts}_w{worker_id}_{job.get('site', 'unknown')[:20]}.txt"
