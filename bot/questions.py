@@ -7,6 +7,8 @@ Usage:
 """
 
 import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import sqlite3
 import sys
 from pathlib import Path
@@ -21,7 +23,9 @@ def main() -> None:
         print("no db / no args")
         return
 
-    conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True) if args[0] == "list" else sqlite3.connect(DB)
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    from applypilot.database import get_connection
+    conn = get_connection()
 
     if args[0] == "list":
         rows = conn.execute(

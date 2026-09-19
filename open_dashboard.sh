@@ -10,6 +10,6 @@ HOST="${APPLYPILOT_VPS:-vps1euro-applypilot}"
 lsof -ti tcp:$PORT | xargs kill 2>/dev/null || true
 sleep 0.3
 
-ssh -f -N -L $PORT:127.0.0.1:$PORT "$HOST"
+ssh -f -N -L $PORT:127.0.0.1:$PORT -L 5432:127.0.0.1:5432 "$HOST"
 echo "tunnel up: http://127.0.0.1:$PORT"
 if command -v open >/dev/null; then open "http://127.0.0.1:$PORT"; fi

@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
 )
 
@@ -292,8 +293,20 @@ func fetchLever(token string) ([]job, error) {
 
 // ── main ───────────────────────────────────────────────────────────────
 
+// openDB selects the backend: APPLYPILOT_DB_URL (postgres) when set,
+// otherwise the local SQLite file.
+func openDB(dbPath string) (*sql.DB, string, error) {
+	dsn := os.Getenv("APPLYPILOT_DB_URL")
+	if strings.HasPrefix(dsn, "postgres") {
+		db, err := sql.Open("pgx", dsn)
+		return db, "postgres", err
+	}
+	db, err := sql.Open("sqlite", dbPath+"?_pragma=busy_timeout(15000)&_pragma=journal_mode(WAL)")
+	return db, "sqlite", err
+}
+
 func main() {
-	dbPath := flag.String("db", home(".applypilot", "applypilot.db"), "path to applypilot.db")
+	dbPath := flag.String("db", home(".applypilot", "applypilot.db"), "path to applypilot.db (sqlite backend)")
 	cfgPath := flag.String("config", home(".applypilot", "searches.yaml"), "searches.yaml for the swamp list")
 	boardsPath := flag.String("boards", home(".applypilot", "boards.yaml"), "boards.yaml with greenhouse/lever tokens")
 	limit := flag.Int("limit", 200, "max jobs per aggregator source")
@@ -310,7 +323,7 @@ func main() {
 		lvTokens = defaultLever
 	}
 
-	db, err := sql.Open("sqlite", *dbPath+"?_pragma=busy_timeout(15000)&_pragma=journal_mode(WAL)")
+	db, dialect, err := openDB(*dbPath)
 	if err != nil {
 		fmt.Println("open db:", err)
 		os.Exit(1)
@@ -321,6 +334,18 @@ func main() {
 		url TEXT PRIMARY KEY, fit_score INTEGER, dismissed_at TEXT)`); err != nil {
 		fmt.Println("ensure dismissed table:", err)
 		os.Exit(1)
+	}
+
+	insertSQL := `INSERT OR IGNORE INTO jobs
+		 (url, title, description, location, site, strategy, discovered_at,
+		  full_description, application_url, detail_scraped_at)
+		 VALUES (?,?,?,?,?,?,?,?,?,?)`
+	if dialect == "postgres" {
+		insertSQL = `INSERT INTO jobs
+		 (url, title, description, location, site, strategy, discovered_at,
+		  full_description, application_url, detail_scraped_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		 ON CONFLICT (url) DO NOTHING`
 	}
 
 	dismissed := map[string]bool{}
@@ -379,11 +404,7 @@ func main() {
 				continue
 			}
 			kept++
-			res, err := db.Exec(
-				`INSERT OR IGNORE INTO jobs
-				 (url, title, description, location, site, strategy, discovered_at,
-				  full_description, application_url, detail_scraped_at)
-				 VALUES (?,?,?,?,?,?,?,?,?,?)`,
+			res, err := db.Exec(insertSQL,
 				j.URL, j.Title, j.Description, j.Location, j.Company, j.Strategy, now,
 				j.Description, j.ApplyURL, now)
 			if err != nil {

@@ -2,6 +2,8 @@
 """Print jobs ready for auto-apply (one per line). Called by the Go bot."""
 
 import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import sqlite3
 import sys
 from pathlib import Path
@@ -23,7 +25,9 @@ def blocked_sites() -> set[str]:
 def main() -> None:
     if not DB.exists():
         return
-    conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    from applypilot.database import get_connection
+    conn = get_connection()
     rows = conn.execute(
         """
         SELECT fit_score, title, site FROM jobs

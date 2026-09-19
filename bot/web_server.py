@@ -23,7 +23,8 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from applypilot.config import APP_DIR, DB_PATH  # noqa: E402
+from applypilot.config import APP_DIR  # noqa: E402
+from applypilot.database import get_connection  # noqa: E402
 from applypilot.view import generate_dashboard  # noqa: E402
 
 PORT = 8730
@@ -33,7 +34,7 @@ def api_delete(url: str) -> dict:
     """Remove a job (and its material files) and tombstone the URL."""
     if not url or not isinstance(url, str):
         return {"ok": False, "error": "url required"}
-    conn = sqlite3.connect(DB_PATH, timeout=15)
+    conn = get_connection()
     try:
         row = conn.execute(
             "SELECT tailored_resume_path, cover_letter_path FROM jobs WHERE url = ?", (url,)
