@@ -244,6 +244,7 @@ var helpText = strings.Join([]string{
 	"ApplyPilot control",
 	"/run — refresh cycle (discover→cover)",
 	"/boards — harvest remote/ATS job boards now",
+	"/crossmatch — link LinkedIn jobs to ATS apply URLs",
 	"/status — pipeline stats",
 	"/queue — ready for auto-apply",
 	"/apply N — submit N applications (confirm by repeat)",
@@ -396,6 +397,10 @@ func handle(cfg *config, msg tgMessage) {
 			out := runCmd(360, boardsBin())
 			send(*cfg, chatID, "<pre>"+clip(out, 3500)+"</pre>")
 		}()
+	case cmd == "/crossmatch":
+		send(*cfg, chatID, "⚠️ Crossmatch needs a browser; this VPS's disk can't handle Chrome "+
+			"without freezing. Run it from the Mac:\n"+
+			"<code>APPLYPILOT_DIR=~/.applypilot applypilot crossmatch</code>")
 	case cmd == "/status":
 		send(*cfg, chatID, "<pre>"+clip(runCmd(60, applypilotBin(), "status"), 3500)+"</pre>")
 	case cmd == "/queue":

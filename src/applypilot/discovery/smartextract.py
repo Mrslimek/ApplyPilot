@@ -161,7 +161,8 @@ def collect_page_intelligence(url: str, headless: bool = True) -> dict:
                 pass
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=headless)
+        from applypilot.browser import launch_browser
+        browser = launch_browser(p, headless=headless)
         page = browser.new_page(user_agent=UA)
         page.on("response", on_response)
 

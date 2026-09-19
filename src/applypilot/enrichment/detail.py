@@ -144,7 +144,8 @@ def resolve_wttj_urls(conn: sqlite3.Connection) -> int:
                 pass
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        from applypilot.browser import launch_browser
+        browser = launch_browser(p, headless=True)
         page = browser.new_page(user_agent=UA)
         page.on("response", capture_algolia)
         page.goto(
@@ -636,7 +637,8 @@ def scrape_site_batch(
             launch_opts: dict = {"headless": True}
             if _PROXY_CONFIG:
                 launch_opts["proxy"] = _PROXY_CONFIG["playwright"]
-            browser = p.chromium.launch(**launch_opts)
+            from applypilot.browser import launch_browser
+            browser = launch_browser(p, **launch_opts)
             context = browser.new_context(user_agent=UA)
             page = context.new_page()
 

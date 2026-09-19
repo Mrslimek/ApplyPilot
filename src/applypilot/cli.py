@@ -143,6 +143,25 @@ def run(
 
 
 @app.command()
+def crossmatch(
+    min_score: int = typer.Option(5, "--min-score", help="Minimum fit score of LinkedIn jobs to match."),
+    company_batch: int = typer.Option(40, "--company-batch", help="Max LinkedIn pages to visit for company names this run."),
+) -> None:
+    """Link LinkedIn jobs to their ATS counterparts (same company + similar title)."""
+    _bootstrap()
+    from applypilot.crossmatch import run_crossmatch
+
+    stats = run_crossmatch(min_score=min_score, company_batch=company_batch)
+    console.print(
+        f"\n[bold]Crossmatch[/bold]\n"
+        f"  ATS pool:            {stats['ats_pool']}\n"
+        f"  Companies fetched:   {stats['companies_filled']}\n"
+        f"  LinkedIn candidates: {stats['linkedin_candidates']}\n"
+        f"  [green]Matched:            {stats['matched']}[/green]"
+    )
+
+
+@app.command()
 def apply(
     limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Max applications to submit."),
     workers: int = typer.Option(1, "--workers", "-w", help="Number of parallel browser workers."),
