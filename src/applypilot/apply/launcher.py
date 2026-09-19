@@ -557,6 +557,21 @@ def run_job(job: dict, port: int, worker_id: int = 0,
         except Exception as e:
             logger.warning("unanswered-questions collection failed: %s", e)
 
+        # Persist the per-application report (agent narrative + perf) so the
+        # user can review what was filled without watching Chrome live.
+        try:
+            conn = get_connection()
+            report = perf_summary + "\n"
+            for tname, ts_ in sorted(perf["tools"].items(), key=lambda kv: -kv[1]["ms"])[:5]:
+                if ts_["ms"] >= 1000:
+                    report += f"perf:   {tname}: {ts_['ms']/1000:.0f}s / {ts_['count']} calls\n"
+            report += "\n" + output[-3500:]
+            conn.execute("UPDATE jobs SET apply_report = ? WHERE url = ?",
+                         (report, job.get("url")))
+            conn.commit()
+        except Exception as e:
+            logger.warning("apply_report save failed: %s", e)
+
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         job_log = config.LOG_DIR / f"claude_{ts}_w{worker_id}_{job.get('site', 'unknown')[:20]}.txt"
         job_log.write_text(output, encoding="utf-8")
@@ -905,6 +920,17 @@ def main(limit: int = 1, target_url: str | None = None,
             f"(${totals['cost']:.3f})[/bold]"
         )
         console.print(f"Logs: {config.LOG_DIR}")
+
+        # Best-effort: push apply results + questions to the VPS so the
+        # Telegram bot (/status, /applied) reflects what happened here.
+        if os.environ.get("APPLYPILOT_NO_SYNC") != "1":
+            sync = Path(__file__).resolve().parents[3] / "scripts" / "sync_state.sh"
+            if sync.exists():
+                try:
+                    subprocess.run(["bash", str(sync)], timeout=180, capture_output=True)
+                    console.print("[dim]state synced to VPS[/dim]")
+                except Exception as e:
+                    logger.warning("post-apply sync failed: %s", e)
 
     except KeyboardInterrupt:
         pass

@@ -247,6 +247,8 @@ var helpText = strings.Join([]string{
 	"/crossmatch — link LinkedIn jobs to ATS apply URLs",
 	"/status — pipeline stats",
 	"/queue — ready for auto-apply",
+	"/applied — recent applications with outcomes",
+	"/report N — full story of application N (what was filled, timings)",
 	"/questions — screening questions awaiting your answers",
 	"/answer N text — answer a collected question",
 	"/apply N — submit N applications (confirm by repeat)",
@@ -403,6 +405,16 @@ func handle(cfg *config, msg tgMessage) {
 		send(*cfg, chatID, "⚠️ Crossmatch needs a browser; this VPS's disk can't handle Chrome "+
 			"without freezing. Run it from the Mac:\n"+
 			"<code>APPLYPILOT_DIR=~/.applypilot applypilot crossmatch</code>")
+	case cmd == "/applied":
+		out := runCmd(30, venvPython(), filepath.Join(projectDir(), "bot", "applied.py"), "list")
+		send(*cfg, chatID, "<b>Recent applications:</b>\n<pre>"+clip(out, 3500)+"</pre>")
+	case cmd == "/report":
+		if len(parts) < 2 {
+			send(*cfg, chatID, "usage: /report <n> (n from /applied)")
+			return
+		}
+		out := runCmd(30, venvPython(), filepath.Join(projectDir(), "bot", "applied.py"), "show", parts[1])
+		send(*cfg, chatID, "<pre>"+clip(out, 3500)+"</pre>")
 	case cmd == "/questions":
 		out := runCmd(30, venvPython(), filepath.Join(projectDir(), "bot", "questions.py"), "list")
 		send(*cfg, chatID, "<b>Screening questions:</b>\n<pre>"+clip(out, 3500)+"</pre>"+"\nAnswer with: /answer &lt;id&gt; &lt;text&gt;")
