@@ -557,6 +557,19 @@ def run_job(job: dict, port: int, worker_id: int = 0,
                     return f"failed:{reason}", duration_ms
             return "failed:unknown", duration_ms
 
+        # Fallback: agents occasionally narrate a successful submission but
+        # forget the RESULT line. Infer success from explicit confirmation
+        # signals instead of losing a real application.
+        if re.search(
+            r"(application (has been )?submitted (successfully|to)|"
+            r"thank you for (your )?(interest|applying)|"
+            r"we.ve (received|got) your application|/confirmation)",
+            output, re.IGNORECASE,
+        ):
+            logger.warning("RESULT line missing — inferring APPLIED from confirmation signals")
+            add_event(f"[W{worker_id}] APPLIED-inferred ({elapsed}s): {job['title'][:30]}")
+            return "applied", duration_ms
+
         add_event(f"[W{worker_id}] NO RESULT ({elapsed}s)")
         update_state(worker_id, status="failed", last_action=f"no result ({elapsed}s)")
         return "failed:no_result_line", duration_ms
