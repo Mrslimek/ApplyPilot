@@ -442,6 +442,12 @@ def run_job(job: dict, port: int, worker_id: int = 0,
         proc.stdin.close()
 
         text_parts: list[str] = []
+        # per-run performance tracking: model turns vs tool (browser) time
+        perf = {"glm_ms": 0, "glm_turns": 0, "tool_ms": 0,
+                "tools": {}}  # name -> {count, ms}
+        pending_tools: dict[str, str] = {}  # tool_use_id -> short name
+        last_ts = time.time()
+        last_kind = "start"
         with open(worker_log, "a", encoding="utf-8") as lf:
             lf.write(log_header)
 
@@ -452,6 +458,27 @@ def run_job(job: dict, port: int, worker_id: int = 0,
                 try:
                     msg = json.loads(line)
                     msg_type = msg.get("type")
+                    now = time.time()
+                    if msg_type == "assistant":
+                        if last_kind in ("user", "start"):
+                            perf["glm_ms"] += (now - last_ts) * 1000
+                            perf["glm_turns"] += 1
+                    elif msg_type == "user":
+                        if last_kind == "assistant":
+                            delta = (now - last_ts) * 1000
+                            perf["tool_ms"] += delta
+                            results = [
+                                b for b in msg.get("message", {}).get("content", [])
+                                if isinstance(b, dict) and b.get("type") == "tool_result"
+                            ]
+                            for b in results:
+                                name = pending_tools.pop(b.get("tool_use_id"), "other")
+                                st = perf["tools"].setdefault(name, {"count": 0, "ms": 0.0})
+                                st["count"] += 1
+                                st["ms"] += delta / max(1, len(results))
+                    if msg_type in ("assistant", "user"):
+                        last_ts, last_kind = now, msg_type
+
                     if msg_type == "assistant":
                         for block in msg.get("message", {}).get("content", []):
                             bt = block.get("type")
@@ -464,6 +491,7 @@ def run_job(job: dict, port: int, worker_id: int = 0,
                                     .replace("mcp__playwright__", "")
                                     .replace("mcp__gmail__", "gmail:")
                                 )
+                                pending_tools[block.get("id", "")] = name
                                 inp = block.get("input", {})
                                 if "url" in inp:
                                     desc = f"{name} {inp['url'][:60]}"
@@ -495,6 +523,19 @@ def run_job(job: dict, port: int, worker_id: int = 0,
                 except json.JSONDecodeError:
                     text_parts.append(line)
                     lf.write(line + "\n")
+
+            # performance breakdown: what actually spent the time
+            calls = sum(s["count"] for s in perf["tools"].values())
+            perf_summary = (
+                f"perf: glm {perf['glm_ms']/1000:.0f}s ({perf['glm_turns']} turns) | "
+                f"tools {perf['tool_ms']/1000:.0f}s ({calls} calls)"
+            )
+            lf.write("\n" + perf_summary + "\n")
+            for name, s in sorted(perf["tools"].items(), key=lambda kv: -kv[1]["ms"])[:5]:
+                if s["ms"] >= 1000:
+                    line_stat = f"perf:   {name}: {s['ms']/1000:.0f}s / {s['count']} calls"
+                    lf.write(line_stat + "\n")
+            add_event(f"[W{worker_id}] {perf_summary}")
 
         proc.wait(timeout=300)
         returncode = proc.returncode
