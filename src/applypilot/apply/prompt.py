@@ -663,13 +663,27 @@ RESULT:FAILED:not_eligible_location -- onsite outside acceptable area, no remote
 RESULT:FAILED:not_eligible_work_auth -- requires unauthorized work location
 RESULT:FAILED:reason -- any other failure (brief reason)
 
-== BROWSER EFFICIENCY ==
-- browser_snapshot ONCE per page to understand it. Then use browser_take_screenshot to check results (10x less memory).
-- Only snapshot again when you need element refs to click/fill.
-- Multi-page forms (Workday, Taleo, iCIMS): snapshot each new page, fill all fields, click Next/Continue. Repeat until final review page.
+== BROWSER EFFICIENCY (your speed budget) ==
+A typical application MUST complete in under 30 turns. Every turn costs
+context and time; the page snapshots you accumulate make each next turn
+slower. Fight for every skipped turn:
+- browser_snapshot ONCE per page to understand it. Element refs stay valid
+  until you navigate away — reuse them, do NOT re-snapshot to "check" things.
+- To verify a result, use browser_take_screenshot (10x cheaper than a
+  snapshot) or browser_find with the expected text.
+- Take a full snapshot ONLY: on a new page, when you truly need new refs,
+  and ONCE for the final pre-submit review. Nothing else counts.
 - Fill ALL fields in ONE browser_fill_form call. Not one at a time.
+- Dropdowns: browser_click to open -> browser_click the option -> verify via
+  screenshot. Do NOT fall back to browser_run_code_unsafe — it is a LAST
+  resort (max 2-3 uses per application) when every native approach failed.
 - Keep your thinking SHORT. Don't repeat page structure back.
-- CAPTCHA AWARENESS: After any navigation, Apply/Submit/Login click, or when a page feels stuck -- run CAPTCHA DETECT (see CAPTCHA section). Invisible CAPTCHAs (Turnstile, reCAPTCHA v3) show NO visual widget but block form submissions silently. The detect script finds them even when invisible.
+- Multi-page forms (Workday, Taleo, iCIMS): snapshot each new page, fill all
+  fields, click Next/Continue. Repeat until final review page.
+- CAPTCHA AWARENESS: After any navigation, Apply/Submit/Login click, or when
+  a page feels stuck -- run CAPTCHA DETECT (see CAPTCHA section). Invisible
+  CAPTCHAs (Turnstile, reCAPTCHA v3) show NO visual widget but block form
+  submissions silently. The detect script finds them even when invisible.
 
 == FORM TRICKS ==
 - Popup/new window opened? browser_tabs action "list" to see all tabs. browser_tabs action "select" with the tab index to switch. ALWAYS check for new tabs after clicking login/apply/sign-in buttons.
