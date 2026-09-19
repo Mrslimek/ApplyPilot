@@ -239,9 +239,10 @@ def launch_chrome(worker_id: int, port: int | None = None,
         "--password-store=basic",
         "--disable-save-password-bubble",
         "--disable-popup-blocking",
-        # Block dangerous permissions at browser level
-        "--use-fake-device-for-media-stream",
-        "--use-fake-ui-for-media-stream",
+        # Block dangerous permissions at browser level.
+        # NOTE: the --use-fake-*-for-media-stream flags were dropped — Chrome
+        # 153 marks them unsupported (yellow infobar, an automation tell),
+        # and --deny-permission-prompts already covers media permissions.
         "--deny-permission-prompts",
         "--disable-notifications",
     ]
