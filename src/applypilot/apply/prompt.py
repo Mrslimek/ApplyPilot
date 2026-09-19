@@ -183,7 +183,13 @@ exact answer whenever the question matches, even partially):
 {lines}
 """
 
-    gender = eeo.get("gender", "Decline to self-identify")
+    gender = eeo.get("gender", "Male")
+    trans = eeo.get("transgender", "No")
+    orient = eeo.get("sexual_orientation", "Heterosexual")
+    race = eeo.get("race_ethnicity", "White")
+    nationality = eeo.get("nationality", "")
+    veteran = eeo.get("veteran_status", "Not a protected veteran")
+    disability = eeo.get("disability_status", "No, I don't have a disability")
 
     return f"""== SCREENING QUESTIONS (be strategic) ==
 Hard facts -> answer truthfully from the profile. No guessing. This includes:
@@ -192,21 +198,25 @@ Hard facts -> answer truthfully from the profile. No guessing. This includes:
   - Citizenship, clearance, licenses, certifications: answer from profile only
   - Criminal/background: answer from profile only
 
-LOGICAL CONSISTENCY (screening knockout filters):
-  - If work authorization for the job's country is No, then "require visa
-    sponsorship" MUST be Yes — they are logically linked. Never answer the
-    pair (No authorization, No sponsorship): ATS filters auto-reject that.
-  - Preferred honest pattern: authorization No + sponsorship Yes + (if a free
-    text is available) note openness to B2B contract as an alternative.
-  - If you are not certain how the candidate wants a policy question answered
-    (sponsorship, work location preferences, notice period), report it in
-    UNANSWERED_QUESTIONS below instead of guessing.
+WORK AUTHORIZATION & SPONSORSHIP POLICY (candidate-verified, B2B):
+  The candidate works as a B2B contractor (sole proprietor, Georgia) and
+  needs NO work permits and NO visa sponsorship.
+  - "Do you require sponsorship / work authorization?" (yes/no) -> No
+  - Same question as a text input -> exactly: No, unless asked for relocation
+  - Location/right-to-work questions -> based in Tbilisi, Georgia; remote B2B worldwide
+  This is the candidate's informed choice, not an error — never "correct" it
+  and never override it with your own reasoning.
 
 Skills and tools -> be confident. This candidate is a {target_role} with {years} years experience. If the question asks "Do you have experience with [tool]?" and it's in the same domain (DevOps, backend, ML, cloud, automation), answer YES. Software engineers learn tools fast. Don't sell short.
 
 Open-ended questions ("Why do you want this role?", "Tell us about yourself", "What interests you?") -> Write 2-3 sentences. Be specific to THIS job. Reference something from the job description. Connect it to a real achievement from the resume. No generic fluff. No "I am passionate about..." -- sound like a real person.
 
-EEO/demographics -> use the profile defaults (gender: {gender}; everything else: "Decline to self-identify" / "Prefer not to say").
+EEO/demographics -> ALWAYS answer, never decline. The candidate answers
+these honestly and specifically. Pick the option that matches the profile
+values (gender: {gender}; transgender: {trans}; orientation: {orient};
+race/ethnicity: {race}; nationality: {nationality}; veteran: {veteran};
+disability: {disability}). Choose the closest specific option when the
+exact wording differs — "Prefer not to say" only if no real option fits.
 
 Attention checks and honeypots ("type 'blue' to prove you read this", riddles,
 secret words) -> complete them the way an attentive human applicant would.
