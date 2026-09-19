@@ -107,15 +107,25 @@ def acquire_job(target_url: str | None = None, min_score: int = 7,
 
         if target_url:
             like = f"%{target_url.split('?')[0].rstrip('/')}%"
+            # exact match first — a prefix LIKE can hit sibling jobs on the
+            # same board (e.g. other uk.indeed.com/viewjob?jk=... postings)
             row = conn.execute("""
                 SELECT url, title, site, application_url, tailored_resume_path,
                        fit_score, location, full_description, cover_letter_path
                 FROM jobs
-                WHERE (url = ? OR application_url = ? OR application_url LIKE ? OR url LIKE ?)
-                  AND tailored_resume_path IS NOT NULL
-                  AND (apply_status IS NULL OR apply_status != 'in_progress')
+                WHERE url = ? OR application_url = ?
                 LIMIT 1
-            """, (target_url, target_url, like, like)).fetchone()
+            """, (target_url, target_url)).fetchone()
+            if not row:
+                row = conn.execute("""
+                    SELECT url, title, site, application_url, tailored_resume_path,
+                           fit_score, location, full_description, cover_letter_path
+                    FROM jobs
+                    WHERE (application_url LIKE ? OR url LIKE ?)
+                      AND tailored_resume_path IS NOT NULL
+                      AND (apply_status IS NULL OR apply_status != 'in_progress')
+                    LIMIT 1
+                """, (like, like)).fetchone()
         else:
             blocked_sites, blocked_patterns = _load_blocked()
             # Build parameterized filters to avoid SQL injection

@@ -8,6 +8,7 @@
 # are flagged as "manual" during apply — bot skips, user applies by hand.
 manual_ats:
   - "ibegin.tcsapps.com"       # TCS iBegin — unsolvable CAPTCHA every time
+  - "indeed.com"               # Indeed portal requires a verified account before applying
 
 # ── Blocked sites — too problematic for automation ───────────────────────
 blocked:
